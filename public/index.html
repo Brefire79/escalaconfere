@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Escalas Bombeiro" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="description" content="Gerenciador de escalas de plantão para bombeiros" />
+    <meta name="application-name" content="Gerenciador de Escalas - Bombeiros" />
+    <meta name="msapplication-TileColor" content="#2563eb" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <!-- PWA Links -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232563eb' width='192' height='192'/><text x='50%' y='50%' font-size='80' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>EB</text></svg>" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%232563eb' width='180' height='180' rx='40'/><text x='90' y='90' font-size='70' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='central'>EB</text></svg>" />
+    
+    <!-- Preload fonts and critical assets -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    
+    <title>Gerenciador de Escalas - Bombeiros</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Registrar Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('Service Worker registrado com sucesso:', registration);
+            })
+            .catch((error) => {
+              console.log('Erro ao registrar Service Worker:', error);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
