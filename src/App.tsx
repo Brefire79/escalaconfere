@@ -104,8 +104,8 @@ const App = () => {
     const grupos: { [key: string]: Escala[] } = {};
     
     escalas.forEach(escala => {
-      const data = new Date(escala.data);
-      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+      const [ano, mes] = escala.data.split('-');
+      const mesAno = `${ano}-${mes}`;
       
       if (!grupos[mesAno]) {
         grupos[mesAno] = [];
