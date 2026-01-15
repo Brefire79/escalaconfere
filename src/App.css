@@ -286,6 +286,27 @@ body {
   user-select: none;
 }
 
+.escala-indicador {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30%;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.escala-tipo-label {
+  font-size: 8px;
+  color: white;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
 .dia:active {
   transform: scale(0.95);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -297,6 +318,8 @@ body {
   margin-bottom: 2px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   font-weight: 600;
+  position: relative;
+  z-index: 2;
 }
 
 .outro-mes .dia-numero {

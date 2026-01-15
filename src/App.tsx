@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 
 interface Escala {
@@ -19,6 +19,29 @@ const App = () => {
   const [mesAtual, setMesAtual] = useState(new Date());
   const [filtroTipo, setFiltroTipo] = useState<'delegada' | 'dejem' | ''>('');
   const [activeTab, setActiveTab] = useState<'calendario' | 'financeiro'>('calendario');
+
+  // Carregar dados do localStorage ao montar
+  useEffect(() => {
+    const valoresSalvos = localStorage.getItem('valoresPlantao');
+    const escalasSalvadas = localStorage.getItem('escalas');
+    
+    if (valoresSalvos) {
+      setValoresPlantao(JSON.parse(valoresSalvos));
+    }
+    if (escalasSalvadas) {
+      setEscalas(JSON.parse(escalasSalvadas));
+    }
+  }, []);
+
+  // Salvar valores no localStorage sempre que mudam
+  useEffect(() => {
+    localStorage.setItem('valoresPlantao', JSON.stringify(valoresPlantao));
+  }, [valoresPlantao]);
+
+  // Salvar escalas no localStorage sempre que mudam
+  useEffect(() => {
+    localStorage.setItem('escalas', JSON.stringify(escalas));
+  }, [escalas]);
 
   const adicionarEscala = () => {
     if (!registro.tipo || !registro.data) return;
@@ -51,10 +74,8 @@ const App = () => {
   };
 
   const escalasDoDia = (dia: Date) => {
-    return escalas.filter(e => {
-      const dataEscala = new Date(e.data);
-      return dataEscala.toDateString() === dia.toDateString();
-    });
+    const diaString = dia.toISOString().split('T')[0];
+    return escalas.filter(e => e.data === diaString);
   };
 
   const corProntidao = (dia: Date) => {
@@ -105,12 +126,15 @@ const App = () => {
         <div className="card">
           <div className="card-content">
             <div className="form-grid">
-              <input 
-                placeholder="Tipo (delegada ou dejem)" 
+              <select 
                 value={registro.tipo} 
                 onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
                 className="input"
-              />
+              >
+                <option value="">Selecione o tipo...</option>
+                <option value="delegada">Delegada</option>
+                <option value="dejem">DEJEM</option>
+              </select>
               <input 
                 type="date" 
                 value={registro.data} 
@@ -124,8 +148,9 @@ const App = () => {
                 <span className="label">Delegada:</span>
                 <input 
                   type="number" 
-                  value={valoresPlantao.delegada} 
-                  onChange={e => setValoresPlantao({ ...valoresPlantao, delegada: parseFloat(e.target.value) || 0 })} 
+                  value={valoresPlantao.delegada || ''} 
+                  onChange={e => setValoresPlantao({ ...valoresPlantao, delegada: e.target.value ? parseFloat(e.target.value) : 0 })} 
+                  placeholder="0"
                   className="input-small"
                 />
               </div>
@@ -133,8 +158,9 @@ const App = () => {
                 <span className="label">DEJEM:</span>
                 <input 
                   type="number" 
-                  value={valoresPlantao.dejem} 
-                  onChange={e => setValoresPlantao({ ...valoresPlantao, dejem: parseFloat(e.target.value) || 0 })} 
+                  value={valoresPlantao.dejem || ''} 
+                  onChange={e => setValoresPlantao({ ...valoresPlantao, dejem: e.target.value ? parseFloat(e.target.value) : 0 })} 
+                  placeholder="0"
                   className="input-small"
                 />
               </div>
@@ -174,9 +200,10 @@ const App = () => {
               
               {diasDoMes().map((dia, i) => {
                 const escalasDia = escalasDoDia(dia);
-                const cor = escalasDia.length > 0 
+                const corEscala = escalasDia.length > 0 
                   ? (escalasDia[0].tipo === 'delegada' ? 'bg-violet-600' : 'bg-red-300') 
-                  : corProntidao(dia);
+                  : '';
+                const corProntidaoFundo = corProntidao(dia);
                 const destaqueFiltro = filtroTipo && escalasDia.some(e => e.tipo === filtroTipo) ? 'ring' : '';
                 const tooltip = escalasDia.length > 0 
                   ? escalasDia.map(e => `${e.tipo.toUpperCase()} - R$ ${(valoresPlantao[e.tipo] || 0).toFixed(2)}`).join('\n') 
@@ -187,8 +214,15 @@ const App = () => {
                   <div 
                     key={i} 
                     title={tooltip} 
-                    className={`dia ${destaqueFiltro} ${cor} ${!mesAtivo ? 'outro-mes' : ''}`}
+                    className={`dia ${destaqueFiltro} ${corProntidaoFundo} ${!mesAtivo ? 'outro-mes' : ''}`}
                   >
+                    {escalasDia.length > 0 && (
+                      <div className={`escala-indicador ${corEscala}`}>
+                        <span className="escala-tipo-label">
+                          {escalasDia[0].tipo === 'delegada' ? 'DEL' : 'DEJ'} - R$ {escalasDia[0].valor.toFixed(0)}
+                        </span>
+                      </div>
+                    )}
                     <span className="dia-numero">{dia.getDate()}</span>
                   </div>
                 );
@@ -209,7 +243,7 @@ const App = () => {
                 <span className="resumo-valor">
                   R$ {escalas
                     .filter(e => e.tipo === 'delegada')
-                    .reduce((sum, e) => sum + (valoresPlantao.delegada || e.valor), 0)
+                    .reduce((sum, e) => sum + e.valor, 0)
                     .toFixed(2)}
                 </span>
               </div>
@@ -219,7 +253,7 @@ const App = () => {
                 <span className="resumo-valor">
                   R$ {escalas
                     .filter(e => e.tipo === 'dejem')
-                    .reduce((sum, e) => sum + (valoresPlantao.dejem || e.valor), 0)
+                    .reduce((sum, e) => sum + e.valor, 0)
                     .toFixed(2)}
                 </span>
               </div>
@@ -228,21 +262,22 @@ const App = () => {
                 <span className="resumo-label">Total Geral:</span>
                 <span className="resumo-valor">
                   R$ {escalas
-                    .reduce((sum, e) => sum + (valoresPlantao[e.tipo] || e.valor), 0)
+                    .reduce((sum, e) => sum + e.valor, 0)
                     .toFixed(2)}
                 </span>
               </div>
             </div>
             
             <div className="lista-escalas">
-              <h3>Lista de Escalas</h3>
-              {escalas.map((escala, index) => (
-                <div key={index} className="escala-item">
-                  <span>{new Date(escala.data).toLocaleDateString('pt-BR')}</span>
-                  <span className="escala-tipo">{escala.tipo.toUpperCase()}</span>
-                  <span className="escala-valor">R$ {(valoresPlantao[escala.tipo] || escala.valor).toFixed(2)}</span>
-                </div>
-              ))}
+              <h3>Lista de Escalas Cumpridas</h3>
+              <div className="escala-item">
+                <span className="escala-tipo">DELEGADA</span>
+                <span className="escala-valor">{escalas.filter(e => e.tipo === 'delegada').length} escalas</span>
+              </div>
+              <div className="escala-item">
+                <span className="escala-tipo">DEJEM</span>
+                <span className="escala-valor">{escalas.filter(e => e.tipo === 'dejem').length} escalas</span>
+              </div>
             </div>
             
             <div className="button-group">
