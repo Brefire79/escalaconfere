@@ -542,6 +542,62 @@ body {
   }
 }
 
+/* Escalas por Mês */
+.mes-container {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #f9fafb;
+}
+
+.mes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #2563eb;
+}
+
+.mes-header h4 {
+  margin: 0;
+  color: #1e40af;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.mes-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #059669;
+}
+
+.mes-detalhes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detalhe-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.detalhe-item span:first-child {
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.detalhe-item span:last-child {
+  color: #059669;
+  font-weight: 500;
+}
+
 /* Safe area */
 @supports (padding: max(0px)) {
   .app-container {
