@@ -5,23 +5,28 @@ import * as XLSX from 'xlsx';
 import './App.css';
 
 interface Escala {
-  tipo: 'delegada' | 'dejem';
+  tipo: 'delegada' | 'dejem' | 'outros';
   data: string;
   valor: number;
+  descricao?: string; // Descrição para tipo 'outros'
 }
 
 interface ValoresPlantao {
   delegada: number;
   dejem: number;
+  outros: number;
 }
 
 const App = () => {
-  const [registro, setRegistro] = useState({ tipo: '', data: '' });
-  const [valoresPlantao, setValoresPlantao] = useState<ValoresPlantao>({ delegada: 0, dejem: 0 });
+  const [registro, setRegistro] = useState({ tipo: '', data: '', descricao: '' });
+  const [valoresPlantao, setValoresPlantao] = useState<ValoresPlantao>({ delegada: 0, dejem: 0, outros: 0 });
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [mesAtual, setMesAtual] = useState(new Date());
-  const [filtroTipo, setFiltroTipo] = useState<'delegada' | 'dejem' | ''>('');
+  const [filtroTipo, setFiltroTipo] = useState<'delegada' | 'dejem' | 'outros' | ''>('');
   const [activeTab, setActiveTab] = useState<'calendario' | 'financeiro'>('calendario');
+  const [modalAberto, setModalAberto] = useState(false);
+  const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
+  const [escalaEditando, setEscalaEditando] = useState<number | null>(null);
 
   // Carregar dados do localStorage ao montar
   useEffect(() => {
@@ -48,15 +53,39 @@ const App = () => {
 
   const adicionarEscala = () => {
     if (!registro.tipo || !registro.data) return;
-    const tipoValido = registro.tipo as 'delegada' | 'dejem';
-    if (tipoValido !== 'delegada' && tipoValido !== 'dejem') return;
+    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
+    if (tipoValido !== 'delegada' && tipoValido !== 'dejem' && tipoValido !== 'outros') return;
     
-    setEscalas([...escalas, { 
-      tipo: tipoValido, 
-      data: registro.data, 
-      valor: valoresPlantao[tipoValido] || 0 
-    }]);
-    setRegistro({ tipo: '', data: '' });
+    // Para outros: validar se tem descrição
+    if (tipoValido === 'outros' && !registro.descricao?.trim()) {
+      alert('Por favor, informe a descrição para o tipo "Outros"');
+      return;
+    }
+    
+    // Para delegada e dejem: verificar se já existe qualquer uma delas no mesmo dia
+    if (tipoValido === 'delegada' || tipoValido === 'dejem') {
+      const jaExisteDelegadaOuDejem = escalas.some(e => 
+        e.data === registro.data && (e.tipo === 'delegada' || e.tipo === 'dejem')
+      );
+      if (jaExisteDelegadaOuDejem) {
+        alert('Já existe uma escala (Delegada ou DEJEM) neste dia! Apenas uma é permitida por dia.');
+        return;
+      }
+    }
+    // Para outros: não há limite, pode adicionar múltiplas
+    
+    const novaEscala: Escala = {
+      tipo: tipoValido,
+      data: registro.data,
+      valor: tipoValido === 'outros' ? 0 : (valoresPlantao[tipoValido] || 0)
+    };
+    
+    if (tipoValido === 'outros') {
+      novaEscala.descricao = registro.descricao;
+    }
+    
+    setEscalas([...escalas, novaEscala]);
+    setRegistro({ tipo: '', data: '', descricao: '' });
   };
 
   const diasDoMes = () => {
@@ -84,7 +113,8 @@ const App = () => {
   const corProntidao = (dia: Date) => {
     const inicio = new Date('2026-01-01');
     const diasPassados = Math.floor((dia.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-    const ciclo = diasPassados % 3;
+    // Garantir que o módulo funcione corretamente com números negativos (datas passadas)
+    const ciclo = ((diasPassados % 3) + 3) % 3;
     return ciclo === 0 ? 'bg-green-400' : ciclo === 1 ? 'bg-yellow-300' : 'bg-blue-400';
   };
 
@@ -99,6 +129,100 @@ const App = () => {
     novaData.setMonth(novaData.getMonth() + direcao);
     setMesAtual(novaData);
   };
+
+  const abrirModalDia = (dia: Date) => {
+    setDiaSelecionado(dia);
+    setModalAberto(true);
+    setEscalaEditando(null);
+    setRegistro({ tipo: '', data: dia.toISOString().split('T')[0], descricao: '' });
+  };
+
+  const fecharModal = () => {
+    setModalAberto(false);
+    setDiaSelecionado(null);
+    setEscalaEditando(null);
+    setRegistro({ tipo: '', data: '', descricao: '' });
+  };
+
+  const adicionarEscalaNoDia = () => {
+    if (!registro.tipo || !registro.data) return;
+    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
+    if (tipoValido !== 'delegada' && tipoValido !== 'dejem' && tipoValido !== 'outros') return;
+    
+    // Para outros: validar se tem descrição
+    if (tipoValido === 'outros' && !registro.descricao?.trim()) {
+      alert('Por favor, informe a descrição para o tipo "Outros"');
+      return;
+    }
+    
+    // Para delegada e dejem: verificar se já existe qualquer uma delas no mesmo dia
+    if (tipoValido === 'delegada' || tipoValido === 'dejem') {
+      const jaExisteDelegadaOuDejem = escalas.some(e => 
+        e.data === registro.data && (e.tipo === 'delegada' || e.tipo === 'dejem')
+      );
+      if (jaExisteDelegadaOuDejem) {
+        alert('Já existe uma escala (Delegada ou DEJEM) neste dia! Apenas uma é permitida por dia.');
+        return;
+      }
+    }
+    // Para outros: não há limite, pode adicionar múltiplas
+    
+    const novaEscala: Escala = {
+      tipo: tipoValido,
+      data: registro.data,
+      valor: tipoValido === 'outros' ? 0 : (valoresPlantao[tipoValido] || 0)
+    };
+    
+    if (tipoValido === 'outros') {
+      novaEscala.descricao = registro.descricao;
+    }
+    
+    setEscalas([...escalas, novaEscala]);
+    setRegistro({ ...registro, tipo: '', descricao: '' });
+  };
+
+  const removerEscala = (index: number) => {
+    if (confirm('Tem certeza que deseja excluir esta escala?')) {
+      const novasEscalas = escalas.filter((_, i) => i !== index);
+      setEscalas(novasEscalas);
+    }
+  };
+
+  const editarEscala = (index: number) => {
+    const escala = escalas[index];
+    setEscalaEditando(index);
+    setRegistro({ tipo: escala.tipo, data: escala.data, descricao: escala.descricao || '' });
+  };
+
+  const salvarEdicao = () => {
+    if (escalaEditando === null || !registro.tipo) return;
+    
+    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
+    
+    // Para outros: validar se tem descrição
+    if (tipoValido === 'outros' && !registro.descricao?.trim()) {
+      alert('Por favor, informe a descrição para o tipo "Outros"');
+      return;
+    }
+    
+    const novasEscalas = [...escalas];
+    novasEscalas[escalaEditando] = {
+      ...novasEscalas[escalaEditando],
+      tipo: tipoValido,
+      valor: tipoValido === 'outros' ? 0 : (valoresPlantao[tipoValido] || 0),
+      descricao: tipoValido === 'outros' ? registro.descricao : undefined
+    };
+    
+    setEscalas(novasEscalas);
+    setEscalaEditando(null);
+    setRegistro({ tipo: '', data: '', descricao: '' });
+  };
+
+  const cancelarEdicao = () => {
+    setEscalaEditando(null);
+    setRegistro({ tipo: '', data: diaSelecionado?.toISOString().split('T')[0] || '', descricao: '' });
+  };
+
 
   const agruparPorMes = () => {
     const grupos: { [key: string]: Escala[] } = {};
@@ -270,6 +394,7 @@ const App = () => {
                 <option value="">Selecione o tipo...</option>
                 <option value="delegada">Delegada</option>
                 <option value="dejem">DEJEM</option>
+                <option value="outros">Outros</option>
               </select>
               <input 
                 type="date" 
@@ -310,12 +435,13 @@ const App = () => {
               <label>Filtrar por tipo:</label>
               <select 
                 value={filtroTipo} 
-                onChange={e => setFiltroTipo(e.target.value as 'delegada' | 'dejem' | '')}
+                onChange={e => setFiltroTipo(e.target.value as 'delegada' | 'dejem' | 'outros' | '')}
                 className="input"
               >
                 <option value="">Todos</option>
                 <option value="delegada">Delegada</option>
                 <option value="dejem">DEJEM</option>
+                <option value="outros">Outros</option>
               </select>
             </div>
             
@@ -336,33 +462,160 @@ const App = () => {
               
               {diasDoMes().map((dia, i) => {
                 const escalasDia = escalasDoDia(dia);
-                const corEscala = escalasDia.length > 0 
-                  ? (escalasDia[0].tipo === 'delegada' ? 'bg-violet-600' : 'bg-red-300') 
-                  : '';
                 const corProntidaoFundo = corProntidao(dia);
                 const destaqueFiltro = filtroTipo && escalasDia.some(e => e.tipo === filtroTipo) ? 'ring' : '';
-                const tooltip = escalasDia.length > 0 
-                  ? escalasDia.map(e => `${e.tipo.toUpperCase()} - R$ ${(valoresPlantao[e.tipo] || 0).toFixed(2)}`).join('\n') 
-                  : '';
                 const mesAtivo = dia.getMonth() === mesAtual.getMonth();
                 
                 return (
                   <div 
                     key={i} 
-                    title={tooltip} 
+                    onClick={() => abrirModalDia(dia)}
                     className={`dia ${destaqueFiltro} ${corProntidaoFundo} ${!mesAtivo ? 'outro-mes' : ''}`}
                   >
+                    <span className="dia-numero">{dia.getDate()}</span>
                     {escalasDia.length > 0 && (
-                      <div className={`escala-indicador ${corEscala}`}>
-                        <span className="escala-tipo-label">
-                          {escalasDia[0].tipo === 'delegada' ? 'DEL' : 'DEJ'} - R$ {escalasDia[0].valor.toFixed(0)}
-                        </span>
+                      <div className="eventos-dia">
+                        {escalasDia.map((escala, idx) => (
+                          <div 
+                            key={idx}
+                            className={`evento-chip ${
+                              escala.tipo === 'delegada' ? 'evento-delegada' : 
+                              escala.tipo === 'dejem' ? 'evento-dejem' : 
+                              'evento-outros'
+                            }`}
+                          >
+                            {escala.tipo === 'delegada' ? 'DEL' : 
+                             escala.tipo === 'dejem' ? 'DEJ' : 
+                             'OUT'}
+                          </div>
+                        ))}
                       </div>
                     )}
-                    <span className="dia-numero">{dia.getDate()}</span>
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Eventos do Dia */}
+      {modalAberto && diaSelecionado && (
+        <div className="modal-overlay" onClick={fecharModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{diaSelecionado.toLocaleDateString('pt-BR', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</h3>
+              <button className="modal-close" onClick={fecharModal}>&times;</button>
+            </div>
+            
+            <div className="modal-body">
+              {/* Adicionar nova escala */}
+              <div className="adicionar-escala-section">
+                <h4>{escalaEditando !== null ? 'Editar Escala' : 'Adicionar Escala'}</h4>
+                <div className="form-inline">
+                  <select 
+                    value={registro.tipo} 
+                    onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
+                    className="input"
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="delegada">Delegada</option>
+                    <option value="dejem">DEJEM</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                  {registro.tipo === 'outros' && (
+                    <input
+                      type="text"
+                      value={registro.descricao}
+                      onChange={e => setRegistro({ ...registro, descricao: e.target.value })}
+                      placeholder="Ex: Tipo de rotina"
+                      className="input"
+                    />
+                  )}
+                  {escalaEditando !== null ? (
+                    <>
+                      <button 
+                        className="button button-save-modal" 
+                        onClick={salvarEdicao}
+                        disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim())}
+                      >
+                        Salvar
+                      </button>
+                      <button 
+                        className="button button-cancel-modal" 
+                        onClick={cancelarEdicao}
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      className="button button-add-modal" 
+                      onClick={adicionarEscalaNoDia}
+                      disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim())}
+                    >
+                      Adicionar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista de escalas existentes */}
+              <div className="escalas-lista-section">
+                <h4>Escalas do Dia</h4>
+                {escalasDoDia(diaSelecionado).length === 0 ? (
+                  <p className="sem-escalas">Nenhuma escala neste dia</p>
+                ) : (
+                  <div className="escalas-lista">
+                    {escalas.map((escala, index) => {
+                      if (escala.data === diaSelecionado.toISOString().split('T')[0]) {
+                        return (
+                          <div key={index} className="escala-item">
+                            <div className="escala-info">
+                              <span className={`escala-badge ${
+                                escala.tipo === 'delegada' ? 'badge-delegada' : 
+                                escala.tipo === 'dejem' ? 'badge-dejem' : 
+                                'badge-outros'
+                              }`}>
+                                {escala.tipo === 'delegada' ? 'DELEGADA' : 
+                                 escala.tipo === 'dejem' ? 'DEJEM' : 
+                                 'OUTROS'}
+                              </span>
+                              {escala.tipo === 'outros' ? (
+                                <span className="escala-descricao">{escala.descricao}</span>
+                              ) : (
+                                <span className="escala-valor">R$ {escala.valor.toFixed(2)}</span>
+                              )}
+                            </div>
+                            <div className="escala-acoes">
+                              <button 
+                                className="button-editar"
+                                onClick={() => editarEscala(index)}
+                                title="Editar escala"
+                              >
+                                ✏️
+                              </button>
+                              <button 
+                                className="button-remover"
+                                onClick={() => removerEscala(index)}
+                                title="Remover escala"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
