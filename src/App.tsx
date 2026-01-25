@@ -27,6 +27,7 @@ const App = () => {
   const [modalAberto, setModalAberto] = useState(false);
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
   const [escalaEditando, setEscalaEditando] = useState<number | null>(null);
+  const [mostrarPainel, setMostrarPainel] = useState(true);
 
   // Carregar dados do localStorage ao montar
   useEffect(() => {
@@ -385,65 +386,75 @@ const App = () => {
       {activeTab === 'calendario' && (
         <div className="card">
           <div className="card-content">
-            <div className="form-grid">
-              <select 
-                value={registro.tipo} 
-                onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
-                className="input"
-              >
-                <option value="">Selecione o tipo...</option>
-                <option value="delegada">Delegada</option>
-                <option value="dejem">DEJEM</option>
-                <option value="outros">Outros</option>
-              </select>
-              <input 
-                type="date" 
-                value={registro.data} 
-                onChange={e => setRegistro({ ...registro, data: e.target.value })}
-                className="input"
-              />
+            {/* Botão para ocultar/mostrar o painel superior */}
+            <div className="painel-toggle">
+              <button className="button" onClick={() => setMostrarPainel(p => !p)}>
+                {mostrarPainel ? 'Ocultar Campos' : 'Mostrar Campos'}
+              </button>
             </div>
-            
-            <div className="valores-container">
-              <div className="valor-item">
-                <span className="label">Delegada:</span>
-                <input 
-                  type="number" 
-                  value={valoresPlantao.delegada || ''} 
-                  onChange={e => setValoresPlantao({ ...valoresPlantao, delegada: e.target.value ? parseFloat(e.target.value) : 0 })} 
-                  placeholder="0"
-                  className="input-small"
-                />
-              </div>
-              <div className="valor-item">
-                <span className="label">DEJEM:</span>
-                <input 
-                  type="number" 
-                  value={valoresPlantao.dejem || ''} 
-                  onChange={e => setValoresPlantao({ ...valoresPlantao, dejem: e.target.value ? parseFloat(e.target.value) : 0 })} 
-                  placeholder="0"
-                  className="input-small"
-                />
-              </div>
-            </div>
-            
-            <button className="button button-add" onClick={adicionarEscala}>
-              Adicionar Escala
-            </button>
-            
-            <div className="filtro-container">
-              <label>Filtrar por tipo:</label>
-              <select 
-                value={filtroTipo} 
-                onChange={e => setFiltroTipo(e.target.value as 'delegada' | 'dejem' | 'outros' | '')}
-                className="input"
-              >
-                <option value="">Todos</option>
-                <option value="delegada">Delegada</option>
-                <option value="dejem">DEJEM</option>
-                <option value="outros">Outros</option>
-              </select>
-            </div>
+            {mostrarPainel && (
+              <>
+                <div className="form-grid">
+                  <select 
+                    value={registro.tipo} 
+                    onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
+                    className="input"
+                  >
+                    <option value="">Selecione o tipo...</option>
+                    <option value="delegada">Delegada</option>
+                    <option value="dejem">DEJEM</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                  <input 
+                    type="date" 
+                    value={registro.data} 
+                    onChange={e => setRegistro({ ...registro, data: e.target.value })}
+                    className="input"
+                  />
+                </div>
+                
+                <div className="valores-container">
+                  <div className="valor-item">
+                    <span className="label">Delegada:</span>
+                    <input 
+                      type="number" 
+                      value={valoresPlantao.delegada || ''} 
+                      onChange={e => setValoresPlantao({ ...valoresPlantao, delegada: e.target.value ? parseFloat(e.target.value) : 0 })} 
+                      placeholder="0"
+                      className="input-small"
+                    />
+                  </div>
+                  <div className="valor-item">
+                    <span className="label">DEJEM:</span>
+                    <input 
+                      type="number" 
+                      value={valoresPlantao.dejem || ''} 
+                      onChange={e => setValoresPlantao({ ...valoresPlantao, dejem: e.target.value ? parseFloat(e.target.value) : 0 })} 
+                      placeholder="0"
+                      className="input-small"
+                    />
+                  </div>
+                </div>
+                
+                <button className="button button-add" onClick={adicionarEscala}>
+                  Adicionar Escala
+                </button>
+                
+                <div className="filtro-container">
+                  <label>Filtrar por tipo:</label>
+                  <select 
+                    value={filtroTipo} 
+                    onChange={e => setFiltroTipo(e.target.value as 'delegada' | 'dejem' | 'outros' | '')}
+                    className="input"
+                  >
+                    <option value="">Todos</option>
+                    <option value="delegada">Delegada</option>
+                    <option value="dejem">DEJEM</option>
+                    <option value="outros">Outros</option>
+                  </select>
+                </div>
+              </>
+            )}
             
             <div className="calendario-header">
               <button className="button" onClick={() => mudarMes(-1)}>Anterior</button>
