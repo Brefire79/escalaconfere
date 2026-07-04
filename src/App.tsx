@@ -9,6 +9,7 @@ interface Escala {
   data: string;
   valor: number;
   funcao?: EscalaFuncao;
+  local?: string; // Local da escala (ex.: Ipiranga, Cambuci).
   descricao?: string; // Texto da anotação.
 }
 
@@ -28,6 +29,21 @@ const TIPOS_UNICOS_POR_DIA: EscalaTipo[] = ['delegada', 'dejem', 'dejemSazonal']
 const isTipoEscala = (tipo: string): tipo is EscalaTipo => TIPOS_ESCALA.includes(tipo as EscalaTipo);
 const isTipoUnicoPorDia = (tipo: EscalaTipo) => TIPOS_UNICOS_POR_DIA.includes(tipo);
 const isFuncaoEscala = (funcao: string): funcao is EscalaFuncao => funcao === 'motorista' || funcao === 'efetivo';
+
+// Opções exibidas nos selects de tipo (tipo + local).
+const OPCOES_ESCALA: { valor: string; label: string; tipo: EscalaTipo; local?: string }[] = [
+  { valor: 'delegada:Ipiranga', label: 'Delegada Ipiranga', tipo: 'delegada', local: 'Ipiranga' },
+  { valor: 'delegada:Vila Prudente', label: 'Delegada Vila Prudente', tipo: 'delegada', local: 'Vila Prudente' },
+  { valor: 'delegada:Vila Mariana', label: 'Delegada Vila Mariana', tipo: 'delegada', local: 'Vila Mariana' },
+  { valor: 'delegada:Jabaquara', label: 'Delegada Jabaquara', tipo: 'delegada', local: 'Jabaquara' },
+  { valor: 'delegada:Sé', label: 'Delegada Sé', tipo: 'delegada', local: 'Sé' },
+  { valor: 'dejem:Cambuci', label: 'DEJEM Cambuci', tipo: 'dejem', local: 'Cambuci' },
+  { valor: 'dejem:Câmara', label: 'DEJEM Câmara', tipo: 'dejem', local: 'Câmara' },
+  { valor: 'dejemSazonal', label: 'DEJEM Sazonal', tipo: 'dejemSazonal' },
+  { valor: 'outros', label: 'Anotação', tipo: 'outros' }
+];
+
+const valorOpcao = (tipo: string, local?: string) => (local ? `${tipo}:${local}` : tipo);
 
 const labelTipo = (tipo: EscalaTipo) => {
   const labels: Record<EscalaTipo, string> = {
@@ -57,13 +73,20 @@ const labelFuncao = (funcao?: EscalaFuncao) => {
   return 'Não informado';
 };
 
+const ehHoje = (dia: Date) => {
+  const hoje = new Date();
+  return dia.getDate() === hoje.getDate() &&
+    dia.getMonth() === hoje.getMonth() &&
+    dia.getFullYear() === hoje.getFullYear();
+};
+
 const formatarDataBR = (data: string) => {
   const [ano, mes, dia] = data.split('-');
   return `${dia}/${mes}/${ano}`;
 };
 
 const App = () => {
-  const [registro, setRegistro] = useState({ tipo: '', data: '', funcao: '', descricao: '' });
+  const [registro, setRegistro] = useState({ tipo: '', data: '', funcao: '', local: '', descricao: '' });
   const [valoresPlantao, setValoresPlantao] = useState<ValoresPlantao>({ delegada: 0, dejem: 0, dejemSazonal: 0, outros: 0 });
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [mesAtual, setMesAtual] = useState(new Date());
@@ -72,7 +95,12 @@ const App = () => {
   const [modalAberto, setModalAberto] = useState(false);
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
   const [escalaEditando, setEscalaEditando] = useState<number | null>(null);
-  const [mostrarPainel, setMostrarPainel] = useState(true);
+  const [mostrarPainel, setMostrarPainel] = useState(false);
+
+  const selecionarTipo = (valor: string) => {
+    const opcao = OPCOES_ESCALA.find(o => o.valor === valor);
+    setRegistro({ ...registro, tipo: opcao?.tipo ?? '', local: opcao?.local ?? '' });
+  };
 
   // Carregar dados do localStorage ao montar
   useEffect(() => {
@@ -133,12 +161,17 @@ const App = () => {
     
     if (tipoValido === 'outros') {
       novaEscala.descricao = registro.descricao;
-    } else if (isFuncaoEscala(registro.funcao)) {
-      novaEscala.funcao = registro.funcao;
+    } else {
+      if (isFuncaoEscala(registro.funcao)) {
+        novaEscala.funcao = registro.funcao;
+      }
+      if (registro.local) {
+        novaEscala.local = registro.local;
+      }
     }
     
     setEscalas([...escalas, novaEscala]);
-    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', local: '', descricao: '' });
   };
 
   const diasDoMes = () => {
@@ -187,14 +220,14 @@ const App = () => {
     setDiaSelecionado(dia);
     setModalAberto(true);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: dia.toISOString().split('T')[0], funcao: '', descricao: '' });
+    setRegistro({ tipo: '', data: dia.toISOString().split('T')[0], funcao: '', local: '', descricao: '' });
   };
 
   const fecharModal = () => {
     setModalAberto(false);
     setDiaSelecionado(null);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', local: '', descricao: '' });
   };
 
   const adicionarEscalaNoDia = () => {
@@ -233,12 +266,17 @@ const App = () => {
     
     if (tipoValido === 'outros') {
       novaEscala.descricao = registro.descricao;
-    } else if (isFuncaoEscala(registro.funcao)) {
-      novaEscala.funcao = registro.funcao;
+    } else {
+      if (isFuncaoEscala(registro.funcao)) {
+        novaEscala.funcao = registro.funcao;
+      }
+      if (registro.local) {
+        novaEscala.local = registro.local;
+      }
     }
     
     setEscalas([...escalas, novaEscala]);
-    setRegistro({ ...registro, tipo: '', funcao: '', descricao: '' });
+    setRegistro({ ...registro, tipo: '', funcao: '', local: '', descricao: '' });
   };
 
   const removerEscala = (index: number) => {
@@ -251,7 +289,7 @@ const App = () => {
   const editarEscala = (index: number) => {
     const escala = escalas[index];
     setEscalaEditando(index);
-    setRegistro({ tipo: escala.tipo, data: escala.data, funcao: escala.funcao || '', descricao: escala.descricao || '' });
+    setRegistro({ tipo: escala.tipo, data: escala.data, funcao: escala.funcao || '', local: escala.local || '', descricao: escala.descricao || '' });
   };
 
   const salvarEdicao = () => {
@@ -287,17 +325,18 @@ const App = () => {
       tipo: tipoValido,
       valor: tipoValido === 'outros' ? 0 : (valoresPlantao[tipoValido] || 0),
       funcao: isTipoUnicoPorDia(tipoValido) && isFuncaoEscala(registro.funcao) ? registro.funcao : undefined,
+      local: isTipoUnicoPorDia(tipoValido) && registro.local ? registro.local : undefined,
       descricao: tipoValido === 'outros' ? registro.descricao : undefined
     };
     
     setEscalas(novasEscalas);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', local: '', descricao: '' });
   };
 
   const cancelarEdicao = () => {
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: diaSelecionado?.toISOString().split('T')[0] || '', funcao: '', descricao: '' });
+    setRegistro({ tipo: '', data: diaSelecionado?.toISOString().split('T')[0] || '', funcao: '', local: '', descricao: '' });
   };
 
 
@@ -441,6 +480,7 @@ const App = () => {
       const dadosDetalhados = escalas.map(escala => ({
       'Data': formatarDataBR(escala.data),
       'Tipo': labelTipo(escala.tipo),
+      'Local': escala.local || '',
       'Função': escala.tipo === 'outros' ? '' : labelFuncao(escala.funcao),
       'Anotação': escala.tipo === 'outros' ? (escala.descricao || '') : '',
       'Valor': escala.valor
@@ -481,16 +521,15 @@ const App = () => {
             {mostrarPainel && (
               <>
                 <div className="form-grid">
-                  <select 
-                    value={registro.tipo} 
-                    onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
+                  <select
+                    value={valorOpcao(registro.tipo, registro.local)}
+                    onChange={e => selecionarTipo(e.target.value)}
                     className="input"
                   >
                     <option value="">Selecione o tipo...</option>
-                    <option value="delegada">Delegada</option>
-                    <option value="dejem">DEJEM</option>
-                    <option value="dejemSazonal">DEJEM Sazonal</option>
-                    <option value="outros">Anotação</option>
+                    {OPCOES_ESCALA.map(opcao => (
+                      <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
+                    ))}
                   </select>
                   <input 
                     type="date" 
@@ -601,7 +640,7 @@ const App = () => {
                     onClick={() => abrirModalDia(dia)}
                     className={`dia ${destaqueFiltro} ${corProntidaoFundo} ${!mesAtivo ? 'outro-mes' : ''}`}
                   >
-                    <span className="dia-numero">{dia.getDate()}</span>
+                    <span className={`dia-numero ${ehHoje(dia) ? 'hoje' : ''}`}>{dia.getDate()}</span>
                     {escalasDia.length > 0 && (
                       <div className="eventos-dia">
                         {escalasDia.map((escala, idx) => (
@@ -646,16 +685,15 @@ const App = () => {
               <div className="adicionar-escala-section">
                 <h4>{escalaEditando !== null ? 'Editar Escala' : 'Adicionar Escala'}</h4>
                 <div className="form-inline">
-                  <select 
-                    value={registro.tipo} 
-                    onChange={e => setRegistro({ ...registro, tipo: e.target.value })} 
+                  <select
+                    value={valorOpcao(registro.tipo, registro.local)}
+                    onChange={e => selecionarTipo(e.target.value)}
                     className="input"
                   >
                     <option value="">Selecione...</option>
-                    <option value="delegada">Delegada</option>
-                    <option value="dejem">DEJEM</option>
-                    <option value="dejemSazonal">DEJEM Sazonal</option>
-                    <option value="outros">Anotação</option>
+                    {OPCOES_ESCALA.map(opcao => (
+                      <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
+                    ))}
                   </select>
                   {isTipoEscala(registro.tipo) && isTipoUnicoPorDia(registro.tipo) && (
                     <select
@@ -729,6 +767,7 @@ const App = () => {
                                 <span className="escala-descricao">{escala.descricao}</span>
                               ) : (
                                 <span className="escala-detalhe">
+                                  {escala.local && <span className="escala-funcao">{escala.local}</span>}
                                   <span className="escala-funcao">{labelFuncao(escala.funcao)}</span>
                                   <span className="escala-valor">R$ {escala.valor.toFixed(2)}</span>
                                 </span>
