@@ -39,7 +39,8 @@ const OPCOES_ESCALA: { valor: string; label: string; tipo: EscalaTipo; local?: s
   { valor: 'delegada:Sé', label: 'Delegada Sé', tipo: 'delegada', local: 'Sé' },
   { valor: 'dejem:Cambuci', label: 'DEJEM Cambuci', tipo: 'dejem', local: 'Cambuci' },
   { valor: 'dejem:Câmara', label: 'DEJEM Câmara', tipo: 'dejem', local: 'Câmara' },
-  { valor: 'dejemSazonal', label: 'DEJEM Sazonal', tipo: 'dejemSazonal' },
+  { valor: 'dejem:Sé', label: 'DEJEM Sé', tipo: 'dejem', local: 'Sé' },
+  { valor: 'dejemSazonal:Cambuci', label: 'DEJEM Sazonal Cambuci', tipo: 'dejemSazonal', local: 'Cambuci' },
   { valor: 'outros', label: 'Anotação', tipo: 'outros' }
 ];
 

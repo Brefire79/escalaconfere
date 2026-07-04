@@ -1,4 +1,4 @@
-const CACHE_NAME = 'escalas-bombeiro-v4';
+const CACHE_NAME = 'escalas-bombeiro-v5';
 const urlsToCache = [
   '/',
   '/index.html',
