@@ -837,6 +837,11 @@ body {
   color: #991b1b;
 }
 
+.badge-dejem-sazonal {
+  background-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
 .badge-outros {
   background-color: #fed7aa;
   color: #92400e;
@@ -846,6 +851,19 @@ body {
   font-weight: 600;
   color: #059669;
   font-size: 14px;
+}
+
+.escala-detalhe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.escala-funcao {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .escala-descricao {
@@ -929,6 +947,11 @@ body {
 
 .evento-dejem {
   background-color: #ef4444;
+  color: white;
+}
+
+.evento-dejem-sazonal {
+  background-color: #2563eb;
   color: white;
 }
 

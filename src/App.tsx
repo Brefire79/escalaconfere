@@ -5,24 +5,69 @@ import * as XLSX from 'xlsx';
 import './App.css';
 
 interface Escala {
-  tipo: 'delegada' | 'dejem' | 'outros';
+  tipo: EscalaTipo;
   data: string;
   valor: number;
-  descricao?: string; // Descrição para tipo 'outros'
+  funcao?: EscalaFuncao;
+  descricao?: string; // Texto da anotação.
 }
+
+type EscalaTipo = 'delegada' | 'dejem' | 'dejemSazonal' | 'outros';
+type EscalaFuncao = 'motorista' | 'efetivo';
 
 interface ValoresPlantao {
   delegada: number;
   dejem: number;
+  dejemSazonal: number;
   outros: number;
 }
 
+const TIPOS_ESCALA: EscalaTipo[] = ['delegada', 'dejem', 'dejemSazonal', 'outros'];
+const TIPOS_UNICOS_POR_DIA: EscalaTipo[] = ['delegada', 'dejem', 'dejemSazonal'];
+
+const isTipoEscala = (tipo: string): tipo is EscalaTipo => TIPOS_ESCALA.includes(tipo as EscalaTipo);
+const isTipoUnicoPorDia = (tipo: EscalaTipo) => TIPOS_UNICOS_POR_DIA.includes(tipo);
+const isFuncaoEscala = (funcao: string): funcao is EscalaFuncao => funcao === 'motorista' || funcao === 'efetivo';
+
+const labelTipo = (tipo: EscalaTipo) => {
+  const labels: Record<EscalaTipo, string> = {
+    delegada: 'Delegada',
+    dejem: 'DEJEM',
+    dejemSazonal: 'DEJEM Sazonal',
+    outros: 'Anotação'
+  };
+
+  return labels[tipo];
+};
+
+const chipTipo = (tipo: EscalaTipo) => {
+  const labels: Record<EscalaTipo, string> = {
+    delegada: 'DEL',
+    dejem: 'DEJ',
+    dejemSazonal: 'SAZ',
+    outros: 'ANO'
+  };
+
+  return labels[tipo];
+};
+
+const labelFuncao = (funcao?: EscalaFuncao) => {
+  if (funcao === 'motorista') return 'Motorista';
+  if (funcao === 'efetivo') return 'Efetivo';
+  return 'Não informado';
+};
+
+const formatarDataBR = (data: string) => {
+  const [ano, mes, dia] = data.split('-');
+  return `${dia}/${mes}/${ano}`;
+};
+
 const App = () => {
-  const [registro, setRegistro] = useState({ tipo: '', data: '', descricao: '' });
-  const [valoresPlantao, setValoresPlantao] = useState<ValoresPlantao>({ delegada: 0, dejem: 0, outros: 0 });
+  const [registro, setRegistro] = useState({ tipo: '', data: '', funcao: '', descricao: '' });
+  const [valoresPlantao, setValoresPlantao] = useState<ValoresPlantao>({ delegada: 0, dejem: 0, dejemSazonal: 0, outros: 0 });
   const [escalas, setEscalas] = useState<Escala[]>([]);
   const [mesAtual, setMesAtual] = useState(new Date());
-  const [filtroTipo, setFiltroTipo] = useState<'delegada' | 'dejem' | 'outros' | ''>('');
+  const [filtroTipo, setFiltroTipo] = useState<EscalaTipo | ''>('');
   const [activeTab, setActiveTab] = useState<'calendario' | 'financeiro'>('calendario');
   const [modalAberto, setModalAberto] = useState(false);
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
@@ -35,7 +80,7 @@ const App = () => {
     const escalasSalvadas = localStorage.getItem('escalas');
     
     if (valoresSalvos) {
-      setValoresPlantao(JSON.parse(valoresSalvos));
+      setValoresPlantao(prev => ({ ...prev, ...JSON.parse(valoresSalvos) }));
     }
     if (escalasSalvadas) {
       setEscalas(JSON.parse(escalasSalvadas));
@@ -54,26 +99,31 @@ const App = () => {
 
   const adicionarEscala = () => {
     if (!registro.tipo || !registro.data) return;
-    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
-    if (tipoValido !== 'delegada' && tipoValido !== 'dejem' && tipoValido !== 'outros') return;
+    if (!isTipoEscala(registro.tipo)) return;
+    const tipoValido = registro.tipo;
     
-    // Para outros: validar se tem descrição
+    // Para anotação: validar se tem informação registrada.
     if (tipoValido === 'outros' && !registro.descricao?.trim()) {
-      alert('Por favor, informe a descrição para o tipo "Outros"');
+      alert('Por favor, informe a anotação.');
+      return;
+    }
+
+    if (isTipoUnicoPorDia(tipoValido) && !isFuncaoEscala(registro.funcao)) {
+      alert('Por favor, selecione se a escala é Motorista ou Efetivo.');
       return;
     }
     
-    // Para delegada e dejem: verificar se já existe qualquer uma delas no mesmo dia
-    if (tipoValido === 'delegada' || tipoValido === 'dejem') {
-      const jaExisteDelegadaOuDejem = escalas.some(e => 
-        e.data === registro.data && (e.tipo === 'delegada' || e.tipo === 'dejem')
+    // Para escalas financeiras principais: apenas uma por dia.
+    if (isTipoUnicoPorDia(tipoValido)) {
+      const jaExisteEscalaPrincipal = escalas.some(e => 
+        e.data === registro.data && isTipoUnicoPorDia(e.tipo)
       );
-      if (jaExisteDelegadaOuDejem) {
-        alert('Já existe uma escala (Delegada ou DEJEM) neste dia! Apenas uma é permitida por dia.');
+      if (jaExisteEscalaPrincipal) {
+        alert('Já existe uma escala (Delegada, DEJEM ou DEJEM Sazonal) neste dia! Apenas uma é permitida por dia.');
         return;
       }
     }
-    // Para outros: não há limite, pode adicionar múltiplas
+    // Para anotação: não há limite, pode adicionar múltiplas.
     
     const novaEscala: Escala = {
       tipo: tipoValido,
@@ -83,10 +133,12 @@ const App = () => {
     
     if (tipoValido === 'outros') {
       novaEscala.descricao = registro.descricao;
+    } else if (isFuncaoEscala(registro.funcao)) {
+      novaEscala.funcao = registro.funcao;
     }
     
     setEscalas([...escalas, novaEscala]);
-    setRegistro({ tipo: '', data: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
   };
 
   const diasDoMes = () => {
@@ -135,38 +187,43 @@ const App = () => {
     setDiaSelecionado(dia);
     setModalAberto(true);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: dia.toISOString().split('T')[0], descricao: '' });
+    setRegistro({ tipo: '', data: dia.toISOString().split('T')[0], funcao: '', descricao: '' });
   };
 
   const fecharModal = () => {
     setModalAberto(false);
     setDiaSelecionado(null);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
   };
 
   const adicionarEscalaNoDia = () => {
     if (!registro.tipo || !registro.data) return;
-    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
-    if (tipoValido !== 'delegada' && tipoValido !== 'dejem' && tipoValido !== 'outros') return;
+    if (!isTipoEscala(registro.tipo)) return;
+    const tipoValido = registro.tipo;
     
-    // Para outros: validar se tem descrição
+    // Para anotação: validar se tem informação registrada.
     if (tipoValido === 'outros' && !registro.descricao?.trim()) {
-      alert('Por favor, informe a descrição para o tipo "Outros"');
+      alert('Por favor, informe a anotação.');
+      return;
+    }
+
+    if (isTipoUnicoPorDia(tipoValido) && !isFuncaoEscala(registro.funcao)) {
+      alert('Por favor, selecione se a escala é Motorista ou Efetivo.');
       return;
     }
     
-    // Para delegada e dejem: verificar se já existe qualquer uma delas no mesmo dia
-    if (tipoValido === 'delegada' || tipoValido === 'dejem') {
-      const jaExisteDelegadaOuDejem = escalas.some(e => 
-        e.data === registro.data && (e.tipo === 'delegada' || e.tipo === 'dejem')
+    // Para escalas financeiras principais: apenas uma por dia.
+    if (isTipoUnicoPorDia(tipoValido)) {
+      const jaExisteEscalaPrincipal = escalas.some(e => 
+        e.data === registro.data && isTipoUnicoPorDia(e.tipo)
       );
-      if (jaExisteDelegadaOuDejem) {
-        alert('Já existe uma escala (Delegada ou DEJEM) neste dia! Apenas uma é permitida por dia.');
+      if (jaExisteEscalaPrincipal) {
+        alert('Já existe uma escala (Delegada, DEJEM ou DEJEM Sazonal) neste dia! Apenas uma é permitida por dia.');
         return;
       }
     }
-    // Para outros: não há limite, pode adicionar múltiplas
+    // Para anotação: não há limite, pode adicionar múltiplas.
     
     const novaEscala: Escala = {
       tipo: tipoValido,
@@ -176,10 +233,12 @@ const App = () => {
     
     if (tipoValido === 'outros') {
       novaEscala.descricao = registro.descricao;
+    } else if (isFuncaoEscala(registro.funcao)) {
+      novaEscala.funcao = registro.funcao;
     }
     
     setEscalas([...escalas, novaEscala]);
-    setRegistro({ ...registro, tipo: '', descricao: '' });
+    setRegistro({ ...registro, tipo: '', funcao: '', descricao: '' });
   };
 
   const removerEscala = (index: number) => {
@@ -192,18 +251,34 @@ const App = () => {
   const editarEscala = (index: number) => {
     const escala = escalas[index];
     setEscalaEditando(index);
-    setRegistro({ tipo: escala.tipo, data: escala.data, descricao: escala.descricao || '' });
+    setRegistro({ tipo: escala.tipo, data: escala.data, funcao: escala.funcao || '', descricao: escala.descricao || '' });
   };
 
   const salvarEdicao = () => {
     if (escalaEditando === null || !registro.tipo) return;
     
-    const tipoValido = registro.tipo as 'delegada' | 'dejem' | 'outros';
+    if (!isTipoEscala(registro.tipo)) return;
+    const tipoValido = registro.tipo;
     
-    // Para outros: validar se tem descrição
+    // Para anotação: validar se tem informação registrada.
     if (tipoValido === 'outros' && !registro.descricao?.trim()) {
-      alert('Por favor, informe a descrição para o tipo "Outros"');
+      alert('Por favor, informe a anotação.');
       return;
+    }
+
+    if (isTipoUnicoPorDia(tipoValido) && !isFuncaoEscala(registro.funcao)) {
+      alert('Por favor, selecione se a escala é Motorista ou Efetivo.');
+      return;
+    }
+
+    if (isTipoUnicoPorDia(tipoValido)) {
+      const jaExisteEscalaPrincipal = escalas.some((e, index) => 
+        index !== escalaEditando && e.data === registro.data && isTipoUnicoPorDia(e.tipo)
+      );
+      if (jaExisteEscalaPrincipal) {
+        alert('Já existe uma escala (Delegada, DEJEM ou DEJEM Sazonal) neste dia! Apenas uma é permitida por dia.');
+        return;
+      }
     }
     
     const novasEscalas = [...escalas];
@@ -211,17 +286,18 @@ const App = () => {
       ...novasEscalas[escalaEditando],
       tipo: tipoValido,
       valor: tipoValido === 'outros' ? 0 : (valoresPlantao[tipoValido] || 0),
+      funcao: isTipoUnicoPorDia(tipoValido) && isFuncaoEscala(registro.funcao) ? registro.funcao : undefined,
       descricao: tipoValido === 'outros' ? registro.descricao : undefined
     };
     
     setEscalas(novasEscalas);
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: '', descricao: '' });
+    setRegistro({ tipo: '', data: '', funcao: '', descricao: '' });
   };
 
   const cancelarEdicao = () => {
     setEscalaEditando(null);
-    setRegistro({ tipo: '', data: diaSelecionado?.toISOString().split('T')[0] || '', descricao: '' });
+    setRegistro({ tipo: '', data: diaSelecionado?.toISOString().split('T')[0] || '', funcao: '', descricao: '' });
   };
 
 
@@ -250,7 +326,8 @@ const App = () => {
         const escalasMes = grupos[mesAno];
         const totalDelegada = escalasMes.filter(e => e.tipo === 'delegada').reduce((sum, e) => sum + e.valor, 0);
         const totalDejem = escalasMes.filter(e => e.tipo === 'dejem').reduce((sum, e) => sum + e.valor, 0);
-        const totalGeral = totalDelegada + totalDejem;
+        const totalDejemSazonal = escalasMes.filter(e => e.tipo === 'dejemSazonal').reduce((sum, e) => sum + e.valor, 0);
+        const totalGeral = totalDelegada + totalDejem + totalDejemSazonal;
         
         return {
           mesAno,
@@ -258,9 +335,11 @@ const App = () => {
           escalas: escalasMes,
           totalDelegada,
           totalDejem,
+          totalDejemSazonal,
           totalGeral,
           qtdDelegada: escalasMes.filter(e => e.tipo === 'delegada').length,
-          qtdDejem: escalasMes.filter(e => e.tipo === 'dejem').length
+          qtdDejem: escalasMes.filter(e => e.tipo === 'dejem').length,
+          qtdDejemSazonal: escalasMes.filter(e => e.tipo === 'dejemSazonal').length
         };
       });
   };
@@ -292,7 +371,8 @@ const App = () => {
         ['Tipo', 'Quantidade', 'Valor Total'],
         ['Delegada', mes.qtdDelegada.toString(), `R$ ${mes.totalDelegada.toFixed(2)}`],
         ['DEJEM', mes.qtdDejem.toString(), `R$ ${mes.totalDejem.toFixed(2)}`],
-        ['TOTAL', (mes.qtdDelegada + mes.qtdDejem).toString(), `R$ ${mes.totalGeral.toFixed(2)}`]
+        ['DEJEM Sazonal', mes.qtdDejemSazonal.toString(), `R$ ${mes.totalDejemSazonal.toFixed(2)}`],
+        ['TOTAL', (mes.qtdDelegada + mes.qtdDejem + mes.qtdDejemSazonal).toString(), `R$ ${mes.totalGeral.toFixed(2)}`]
       ];
       
       autoTable(doc, {
@@ -309,7 +389,8 @@ const App = () => {
     
     const totalGeralDelegada = escalas.filter(e => e.tipo === 'delegada').reduce((sum, e) => sum + e.valor, 0);
     const totalGeralDejem = escalas.filter(e => e.tipo === 'dejem').reduce((sum, e) => sum + e.valor, 0);
-    const totalGeralCompleto = totalGeralDelegada + totalGeralDejem;
+    const totalGeralDejemSazonal = escalas.filter(e => e.tipo === 'dejemSazonal').reduce((sum, e) => sum + e.valor, 0);
+    const totalGeralCompleto = totalGeralDelegada + totalGeralDejem + totalGeralDejemSazonal;
     
     if (yPos > 240) {
       doc.addPage();
@@ -326,6 +407,7 @@ const App = () => {
       body: [
         ['Total Delegada:', `R$ ${totalGeralDelegada.toFixed(2)}`],
         ['Total DEJEM:', `R$ ${totalGeralDejem.toFixed(2)}`],
+        ['Total DEJEM Sazonal:', `R$ ${totalGeralDejemSazonal.toFixed(2)}`],
         ['TOTAL GERAL:', `R$ ${totalGeralCompleto.toFixed(2)}`]
       ],
       theme: 'plain',
@@ -347,6 +429,8 @@ const App = () => {
       'Delegada (Valor)': mes.totalDelegada,
       'DEJEM (Qtd)': mes.qtdDejem,
       'DEJEM (Valor)': mes.totalDejem,
+      'DEJEM Sazonal (Qtd)': mes.qtdDejemSazonal,
+      'DEJEM Sazonal (Valor)': mes.totalDejemSazonal,
       'Total Geral': mes.totalGeral
     }));
     
@@ -354,9 +438,11 @@ const App = () => {
     XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo Mensal');
     
     // Planilha com todas as escalas
-    const dadosDetalhados = escalas.map(escala => ({
-      'Data': new Date(escala.data).toLocaleDateString('pt-BR'),
-      'Tipo': escala.tipo.toUpperCase(),
+      const dadosDetalhados = escalas.map(escala => ({
+      'Data': formatarDataBR(escala.data),
+      'Tipo': labelTipo(escala.tipo),
+      'Função': escala.tipo === 'outros' ? '' : labelFuncao(escala.funcao),
+      'Anotação': escala.tipo === 'outros' ? (escala.descricao || '') : '',
       'Valor': escala.valor
     }));
     
@@ -403,7 +489,8 @@ const App = () => {
                     <option value="">Selecione o tipo...</option>
                     <option value="delegada">Delegada</option>
                     <option value="dejem">DEJEM</option>
-                    <option value="outros">Outros</option>
+                    <option value="dejemSazonal">DEJEM Sazonal</option>
+                    <option value="outros">Anotação</option>
                   </select>
                   <input 
                     type="date" 
@@ -411,6 +498,26 @@ const App = () => {
                     onChange={e => setRegistro({ ...registro, data: e.target.value })}
                     className="input"
                   />
+                  {isTipoEscala(registro.tipo) && isTipoUnicoPorDia(registro.tipo) && (
+                    <select
+                      value={registro.funcao}
+                      onChange={e => setRegistro({ ...registro, funcao: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Motorista ou Efetivo?</option>
+                      <option value="motorista">Motorista</option>
+                      <option value="efetivo">Efetivo</option>
+                    </select>
+                  )}
+                  {registro.tipo === 'outros' && (
+                    <input
+                      type="text"
+                      value={registro.descricao}
+                      onChange={e => setRegistro({ ...registro, descricao: e.target.value })}
+                      placeholder="Informação a anotar"
+                      className="input"
+                    />
+                  )}
                 </div>
                 
                 <div className="valores-container">
@@ -434,6 +541,16 @@ const App = () => {
                       className="input-small"
                     />
                   </div>
+                  <div className="valor-item">
+                    <span className="label">DEJEM Sazonal:</span>
+                    <input 
+                      type="number" 
+                      value={valoresPlantao.dejemSazonal || ''} 
+                      onChange={e => setValoresPlantao({ ...valoresPlantao, dejemSazonal: e.target.value ? parseFloat(e.target.value) : 0 })} 
+                      placeholder="0"
+                      className="input-small"
+                    />
+                  </div>
                 </div>
                 
                 <button className="button button-add" onClick={adicionarEscala}>
@@ -444,13 +561,14 @@ const App = () => {
                   <label>Filtrar por tipo:</label>
                   <select 
                     value={filtroTipo} 
-                    onChange={e => setFiltroTipo(e.target.value as 'delegada' | 'dejem' | 'outros' | '')}
+                    onChange={e => setFiltroTipo(e.target.value as EscalaTipo | '')}
                     className="input"
                   >
                     <option value="">Todos</option>
                     <option value="delegada">Delegada</option>
                     <option value="dejem">DEJEM</option>
-                    <option value="outros">Outros</option>
+                    <option value="dejemSazonal">DEJEM Sazonal</option>
+                    <option value="outros">Anotação</option>
                   </select>
                 </div>
               </>
@@ -492,12 +610,11 @@ const App = () => {
                             className={`evento-chip ${
                               escala.tipo === 'delegada' ? 'evento-delegada' : 
                               escala.tipo === 'dejem' ? 'evento-dejem' : 
+                              escala.tipo === 'dejemSazonal' ? 'evento-dejem-sazonal' : 
                               'evento-outros'
                             }`}
                           >
-                            {escala.tipo === 'delegada' ? 'DEL' : 
-                             escala.tipo === 'dejem' ? 'DEJ' : 
-                             'OUT'}
+                            {chipTipo(escala.tipo)}
                           </div>
                         ))}
                       </div>
@@ -537,14 +654,26 @@ const App = () => {
                     <option value="">Selecione...</option>
                     <option value="delegada">Delegada</option>
                     <option value="dejem">DEJEM</option>
-                    <option value="outros">Outros</option>
+                    <option value="dejemSazonal">DEJEM Sazonal</option>
+                    <option value="outros">Anotação</option>
                   </select>
+                  {isTipoEscala(registro.tipo) && isTipoUnicoPorDia(registro.tipo) && (
+                    <select
+                      value={registro.funcao}
+                      onChange={e => setRegistro({ ...registro, funcao: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Motorista ou Efetivo?</option>
+                      <option value="motorista">Motorista</option>
+                      <option value="efetivo">Efetivo</option>
+                    </select>
+                  )}
                   {registro.tipo === 'outros' && (
                     <input
                       type="text"
                       value={registro.descricao}
                       onChange={e => setRegistro({ ...registro, descricao: e.target.value })}
-                      placeholder="Ex: Tipo de rotina"
+                      placeholder="Informação a anotar"
                       className="input"
                     />
                   )}
@@ -553,7 +682,7 @@ const App = () => {
                       <button 
                         className="button button-save-modal" 
                         onClick={salvarEdicao}
-                        disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim())}
+                        disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim()) || (isTipoEscala(registro.tipo) && isTipoUnicoPorDia(registro.tipo) && !isFuncaoEscala(registro.funcao))}
                       >
                         Salvar
                       </button>
@@ -568,7 +697,7 @@ const App = () => {
                     <button 
                       className="button button-add-modal" 
                       onClick={adicionarEscalaNoDia}
-                      disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim())}
+                      disabled={!registro.tipo || (registro.tipo === 'outros' && !registro.descricao?.trim()) || (isTipoEscala(registro.tipo) && isTipoUnicoPorDia(registro.tipo) && !isFuncaoEscala(registro.funcao))}
                     >
                       Adicionar
                     </button>
@@ -591,16 +720,18 @@ const App = () => {
                               <span className={`escala-badge ${
                                 escala.tipo === 'delegada' ? 'badge-delegada' : 
                                 escala.tipo === 'dejem' ? 'badge-dejem' : 
+                                escala.tipo === 'dejemSazonal' ? 'badge-dejem-sazonal' : 
                                 'badge-outros'
                               }`}>
-                                {escala.tipo === 'delegada' ? 'DELEGADA' : 
-                                 escala.tipo === 'dejem' ? 'DEJEM' : 
-                                 'OUTROS'}
+                                {labelTipo(escala.tipo).toUpperCase()}
                               </span>
                               {escala.tipo === 'outros' ? (
                                 <span className="escala-descricao">{escala.descricao}</span>
                               ) : (
-                                <span className="escala-valor">R$ {escala.valor.toFixed(2)}</span>
+                                <span className="escala-detalhe">
+                                  <span className="escala-funcao">{labelFuncao(escala.funcao)}</span>
+                                  <span className="escala-valor">R$ {escala.valor.toFixed(2)}</span>
+                                </span>
                               )}
                             </div>
                             <div className="escala-acoes">
@@ -657,6 +788,16 @@ const App = () => {
                     .toFixed(2)}
                 </span>
               </div>
+
+              <div className="resumo-item">
+                <span className="resumo-label">Total DEJEM Sazonal:</span>
+                <span className="resumo-valor">
+                  R$ {escalas
+                    .filter(e => e.tipo === 'dejemSazonal')
+                    .reduce((sum, e) => sum + e.valor, 0)
+                    .toFixed(2)}
+                </span>
+              </div>
               
               <div className="resumo-item total">
                 <span className="resumo-label">Total Geral:</span>
@@ -684,6 +825,10 @@ const App = () => {
                     <div className="detalhe-item">
                       <span>DEJEM:</span>
                       <span>{mes.qtdDejem} escalas - R$ {mes.totalDejem.toFixed(2)}</span>
+                    </div>
+                    <div className="detalhe-item">
+                      <span>DEJEM Sazonal:</span>
+                      <span>{mes.qtdDejemSazonal} escalas - R$ {mes.totalDejemSazonal.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
